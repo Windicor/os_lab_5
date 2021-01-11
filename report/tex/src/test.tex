@@ -1,0 +1,91 @@
+\section{Пример работы}
+
+Продемонстрирую процесс сборки второй программы:
+
+\begin{verbatim}
+
+windicor@Lina-HP:~$ gcc -fPIC -c mylib.c
+windicor@Lina-HP:~$ gcc -shared -o libmy.so mylib.o
+windicor@Lina-HP:~$ gcc -c main.c
+windicor@Lina-HP:~$ gcc main.o -Wl,-rpath,. -ldl
+
+\end{verbatim}
+
+Первый тест - проверка на обработку корректных входных данных:
+
+\begin{verbatim}
+
+windicor@Lina-HP:~$ cat test1
+1 4 6
+1 10 10
+1 1000000 2000000
+2 5 1 2 3 4 5
+2 5 5 4 3 2 1
+2 5 3 4 2 5 1
+0
+1 4 6
+1 10 10
+1 1000000 2000000
+2 5 1 2 3 4 5
+2 5 5 4 3 2 1
+2 5 3 4 2 5 1
+windicor@Lina-HP:~$ ./a.out <test1
+gcd first implementation
+gcd: 2
+gcd first implementation
+gcd: 10
+gcd first implementation
+gcd: 1000000
+sort first implementation
+sorted: 1 2 3 4 5
+sort first implementation
+sorted: 1 2 3 4 5 
+sort first implementation
+sorted: 1 2 3 4 5
+gcd second implementation
+gcd: 2
+gcd second implementation
+gcd: 10
+gcd second implementation
+gcd: 1000000
+sort second implementation
+sorted: 1 2 3 4 5
+sort second implementation
+sorted: 1 2 3 4 5
+sort second implementation
+sorted: 1 2 3 4 5
+
+\end{verbatim}
+
+Вторым тестом продемонстрируем обработку некорректного ввода:
+
+\begin{verbatim}
+
+windicor@Lina-HP:~$ cat test2
+5 4 6
+9 4 2
+2 5
+windicor@Lina-HP:~$ ./a.out <test2
+Undefined command
+Undefined command
+Undefined command
+Undefined command
+Undefined command
+Func 2 array input error
+
+\end{verbatim}
+
+Третьим тестом продемонстрируем работу программы при отсутствии библиотеки libmy.so:
+
+\begin{verbatim}
+    
+windicor@Lina-HP:~$ ls
+USING.txt  a.out  main.c  main.o  mylib.c  mylib.o  not_a_libmy.so
+windicor@Lina-HP:~$ ./a.out 
+Cannot open library libmy.so
+    
+\end{verbatim}
+
+\pagebreak
+
+

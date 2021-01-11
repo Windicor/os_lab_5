@@ -1,0 +1,346 @@
+\section{Общие сведения о программе}
+
+Лабораторная состоит из двух программ. В первом случае, где мы подключаем библиотеку на этапе линковки, всё тривиально. Во втором требуется использовать ряд системных вызовов, таких как dlopen, dlsym и dlclose. Также требуется особым образом собирать программу.
+
+\section{Общий метод и алгоритм решения}
+
+Для реализации поставленной задачи необходимо:
+
+\begin{enumerate}
+    \item Изучить принципы создания и использования динамических библиотек
+    \item Написать функции библиотеки
+    \item Написать первую программу
+    \item Написать вторую программу, используя системные вызовы
+    \item Написать обработку ошибок
+    \item Собрать проект
+    \item Написать тесты
+\end{enumerate}
+
+\pagebreak
+
+\section{Исходный код}
+
+{\large Первая программа}
+
+\textbf{main.c}
+
+\begin{lstlisting}[language=C]
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "mylib.h"
+
+#define GCD_INPUT_ERROR 1
+#define SORT_SIZE_INPUT_ERROR 2
+#define SORT_ARRAY_INPUT_ERROR 3
+
+void gcd_cmd() {
+  int a, b;
+  if (scanf("%d%d", &a, &b) != 2) {
+    fprintf(stderr, "Func 1 input error\n");
+    exit(GCD_INPUT_ERROR);
+  }
+  printf("gcd: %d\n", gcd1(a, b));
+}
+
+void read_array(int* array, size_t size) {
+  for (size_t i = 0; i < size; ++i) {
+    if (scanf("%d", array + i) != 1) {
+      fprintf(stderr, "Func 2 array input error\n");
+      exit(SORT_ARRAY_INPUT_ERROR);
+    }
+  }
+}
+
+void print_array(int* array, size_t size) {
+  printf("sorted: ");
+  for (size_t i = 0; i < size; ++i) {
+    printf("%d ", array[i]);
+  }
+  printf("\n");
+}
+
+void sort_cmd() {
+  int size;
+  if (scanf("%d", &size) != 1) {
+    fprintf(stderr, "Func 2 size input error\n");
+    exit(SORT_SIZE_INPUT_ERROR);
+  }
+  int* array = malloc(size * sizeof(int));
+  read_array(array, size);
+  sort1(array, size);
+  print_array(array, size);
+}
+
+int main() {
+  int cmd;
+  while (scanf("%d", &cmd) == 1) {
+    switch (cmd) {
+      case 1:
+        gcd_cmd();
+        break;
+      case 2:
+        sort_cmd();
+        break;
+      default:
+        fprintf(stderr, "Undefined command\n");
+        break;
+    }
+  }
+  return 0;
+}
+
+\end{lstlisting}
+
+\textbf{mylib.h}
+
+\begin{lstlisting}[language=C]
+
+#pragma once
+
+int gcd1(int a, int b);
+int gcd2(int a, int b);
+
+void sort1(int* array, unsigned long size);
+void sort2(int* array, unsigned long size);
+
+\end{lstlisting}
+
+\textbf{mylib.c}
+
+\begin{lstlisting}[language=C]
+
+#include <stdlib.h>
+
+void swap(unsigned int* a, unsigned int* b) {
+  unsigned int t = *a;
+  *a = *b;
+  *b = t;
+}
+
+int gcd1(int a_inp, int b_inp) {
+  unsigned int a = a_inp, b = b_inp;
+  while (b) {
+    a %= b;
+    swap(&a, &b);
+  }
+  return a;
+}
+
+unsigned int min(unsigned int a, unsigned int b) {
+  if (a < b) {
+    return a;
+  }
+  return b;
+}
+
+int gcd2(int a_inp, int b_inp) {
+  unsigned int a = a_inp, b = b_inp;
+  for (int i = min(a, b); i > 1; --i) {
+    if (a % i == 0 && b % i == 0) {
+      return i;
+    }
+  }
+  return 1;
+}
+
+void sort1(int* array, unsigned long size) {
+  for (unsigned long i = 0; i < size; ++i) {
+    for (unsigned long j = 0; j < size - 1; ++j) {
+      if (array[j] > array[j + 1]) {
+        swap(array + j, array + j + 1);
+      }
+    }
+  }
+}
+
+int compare(const void* a, const void* b) {
+  return (*(int*)a - *(int*)b);
+}
+
+void sort2(int* array, unsigned long size) {
+  qsort(array, size, sizeof(int), compare);
+}
+
+\end{lstlisting}
+
+\pagebreak
+
+{\large Вторая программа}
+
+\textbf{main.c}
+
+\begin{lstlisting}[language=C]
+
+#include <dlfcn.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define GCD_INPUT_ERROR 1
+#define SORT_SIZE_INPUT_ERROR 2
+#define SORT_ARRAY_INPUT_ERROR 3
+#define CANNOT_OPEN_LIBRARY_ERROR 4
+#define CANNOT_FIND_FUNC_ERROR 5
+
+void* lib;
+int (*gcd)(int, int);
+void (*sort)(int*, unsigned long);
+
+void gcd_cmd() {
+  int a, b;
+  if (scanf("%d%d", &a, &b) != 2) {
+    fprintf(stderr, "Func 1 input error\n");
+    exit(GCD_INPUT_ERROR);
+  }
+  printf("gcd: %d\n", gcd(a, b));
+}
+
+void read_array(int* array, size_t size) {
+  for (size_t i = 0; i < size; ++i) {
+    if (scanf("%d", array + i) != 1) {
+      fprintf(stderr, "Func 2 array input error\n");
+      exit(SORT_ARRAY_INPUT_ERROR);
+    }
+  }
+}
+
+void print_array(int* array, size_t size) {
+  printf("sorted: ");
+  for (size_t i = 0; i < size; ++i) {
+    printf("%d ", array[i]);
+  }
+  printf("\n");
+}
+
+void sort_cmd() {
+  int size;
+  if (scanf("%d", &size) != 1) {
+    fprintf(stderr, "Func 2 size input error\n");
+    exit(SORT_SIZE_INPUT_ERROR);
+  }
+  int* array = malloc(size * sizeof(int));
+  read_array(array, size);
+  sort(array, size);
+  print_array(array, size);
+}
+
+int is_first_implementation = 1;
+void swap_functions() {
+  if (is_first_implementation) {
+    gcd = dlsym(lib, "gcd1");
+    sort = dlsym(lib, "sort1");
+  } else {
+    gcd = dlsym(lib, "gcd2");
+    sort = dlsym(lib, "sort2");
+  }
+  is_first_implementation = !is_first_implementation;
+  if (gcd == NULL || sort == NULL) {
+    fprintf(stderr, "Cannot find functions\n");
+    exit(CANNOT_FIND_FUNC_ERROR);
+  }
+}
+
+void load_lib() {
+  lib = dlopen("libmy.so", RTLD_LAZY);
+  if (!lib) {
+    fprintf(stderr, "Cannot open library libmy.so\n");
+    exit(CANNOT_OPEN_LIBRARY_ERROR);
+  }
+  swap_functions();
+}
+
+void close_lib() {
+  dlclose(lib);
+}
+
+int main() {
+  load_lib();
+  int cmd;
+  while (scanf("%d", &cmd) == 1) {
+    switch (cmd) {
+      case 0:
+        swap_functions();
+        break;
+      case 1:
+        gcd_cmd();
+        break;
+      case 2:
+        sort_cmd();
+        break;
+      default:
+        fprintf(stderr, "Undefined command\n");
+        break;
+    }
+  }
+  close_lib();
+  return 0;
+}
+
+
+\end{lstlisting}
+
+\textbf{mylib.c}
+
+\begin{lstlisting}[language=C]
+
+#include <stdio.h>
+#include <stdlib.h>
+
+void swap(unsigned int* a, unsigned int* b) {
+  unsigned int t = *a;
+  *a = *b;
+  *b = t;
+}
+
+int gcd1(int a_inp, int b_inp) {
+  fprintf(stderr, "gcd first implementation\n");
+  unsigned int a = a_inp, b = b_inp;
+  while (b) {
+    a %= b;
+    swap(&a, &b);
+  }
+  return a;
+}
+
+unsigned int min(unsigned int a, unsigned int b) {
+  if (a < b) {
+    return a;
+  }
+  return b;
+}
+
+int gcd2(int a_inp, int b_inp) {
+  fprintf(stderr, "gcd second implementation\n");
+  unsigned int a = a_inp, b = b_inp;
+  for (int i = min(a, b); i > 1; --i) {
+    if (a % i == 0 && b % i == 0) {
+      return i;
+    }
+  }
+  return 1;
+}
+
+void sort1(int* array, unsigned long size) {
+  fprintf(stderr, "sort first implementation\n");
+  for (unsigned long i = 0; i < size; ++i) {
+    for (unsigned long j = 0; j < size - 1; ++j) {
+      if (array[j] > array[j + 1]) {
+        swap(array + j, array + j + 1);
+      }
+    }
+  }
+}
+
+int compare(const void* a, const void* b) {
+  return (*(int*)a - *(int*)b);
+}
+
+void sort2(int* array, unsigned long size) {
+  fprintf(stderr, "sort second implementation\n");
+  qsort(array, size, sizeof(int), compare);
+}
+
+\end{lstlisting}
+
+\pagebreak
